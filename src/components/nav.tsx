@@ -13,20 +13,28 @@ const tabs = [
 export default function Nav() {
   const path = usePathname();
   return (
-    <nav className="flex items-center gap-3 p-3 border-b border-[color:var(--border)] bg-[color:var(--bg)]">
-      <Link href="/dashboard" className="mr-auto flex items-center gap-2" aria-label="Skylog home">
-        <Image src="/skylog-logo.png" alt="Skylog" width={24} height={24} priority />
-        <span className="font-extrabold tracking-tight">Skylog</span>
+    <nav className="flex items-center justify-between px-4 py-3 border-b border-[color:var(--border)]">
+      <Link href="/dashboard" className="flex items-center gap-2">
+        <Image src="/skylog-logo.png" alt="Skylog" width={20} height={20} />
+        <span className="font-bold">Skylog</span>
       </Link>
-      {tabs.map(t => (
-        <Link
-          key={t.href}
-          className={`px-3 py-1 rounded ${path.startsWith(t.href) ? "bg-[color:var(--chip)]" : "hover:bg-[color:var(--chip)]/40"}`}
-          href={t.href}
-        >
-          {t.label}
-        </Link>
-      ))}
+
+      <ul className="flex items-center gap-4">
+        {tabs.map(t => (
+          <li key={t.href}>
+            <Link
+              href={t.href}
+              className={`px-3 py-1 rounded ${
+                path.startsWith(t.href)
+                  ? "bg-[color:var(--chip)]"
+                  : "hover:bg-white/10"
+              }`}
+            >
+              {t.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
     </nav>
   );
 }
