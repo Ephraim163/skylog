@@ -1,0 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root{
+  --fg:#e5e7eb; --muted:#9ca3af; --border:#374151;
+  --bg:#0b1220; --chip:#111827; --chipfg:#e5e7eb;
+  --ok:#10b981; --bad:#ef4444; --accent:#22d3ee;
+}
+html,body{background:linear-gradient(180deg,#0b1220 0%,#111827 100%);}
+*{color:var(--fg);}
