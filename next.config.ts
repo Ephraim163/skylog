@@ -1,13 +1,8 @@
-// next.config.ts
 const repo = "skylog";
 const isProd = process.env.NODE_ENV === "production";
-
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  output: "export",              // static build for GitHub Pages
+export default {
+  output: "export",
   basePath: isProd ? `/${repo}` : "",
   assetPrefix: isProd ? `/${repo}/` : "",
-  images: { unoptimized: true }, // required for next/image on Pages
-};
-
-export default nextConfig;
+  images: { unoptimized: true },
+} as const;
