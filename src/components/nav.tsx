@@ -11,7 +11,10 @@ const tabs = [
 ];
 
 export default function Nav() {
-  const path = usePathname();
+  // `usePathname` may return `null` during initial render in some environments
+  // which would cause `startsWith` to throw. Default to empty string so the
+  // navigation bar renders safely even when the path is temporarily unknown.
+  const path = usePathname() ?? "";
   return (
     <nav className="flex items-center justify-between px-4 py-3 border-b border-[color:var(--border)]">
       <Link href="/dashboard" className="flex items-center gap-2">
