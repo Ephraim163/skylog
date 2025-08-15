@@ -1,0 +1,7 @@
+Risk Category,Risk Description,Likelihood,Impact,Mitigation Strategy
+Regulatory Compliance,Failure to meet EASA Part 145 or GCAA CAR 145 requirements leading to non-approval.,Medium,High,"Engage compliance consultants, pre-map modules to regulations, run UAT with certified MROs."
+Technical Development,"Delays in MVP delivery due to complex integrations (IoT, blockchain).",Medium,Medium,"Prioritize core features in MVP, integrate advanced tech in later releases, hire experienced devs."
+Financial,Running out of funds before reaching break-even.,Medium,High,"Stage funding rounds, keep fixed costs low, focus on early adopter revenue."
+Market Adoption,Slow customer uptake due to industry resistance to change.,High,Medium,"Offer free pilots, show ROI with real data, target tech-forward clients first."
+Cybersecurity,Data breaches affecting operational and compliance records.,Low,High,"Implement ISO 27001 practices, encryption at rest and in transit, regular penetration tests."
+Competition,"Established players (AMOS, Trax) launching similar features.",Medium,High,"Focus on niche capabilities, faster deployment, lower onboarding costs."

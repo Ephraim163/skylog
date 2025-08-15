@@ -1,0 +1,65 @@
+
+SkyLog Ecosystem – 121 Module Master Reference
+==============================================
+
+Purpose:
+--------
+This document is a persistent reference for the SkyLog Ecosystem architecture, including all modules (#1–#121), grouped by functional area, and their associated regulatory compliance mapping. 
+It ensures continuity of context for future discussions, development, and certification preparation.
+
+----------------------------------------------
+Functional Groups & Module Ranges:
+----------------------------------------------
+
+1. Core Company Modules (#1–#68)
+   - Covers management, quality, engineering, HR/payroll, production, compliance, and internal logistics.
+
+2. Vendor Capability Modules (#69–#95)
+   - Vendor onboarding, bidding, documentation, KPI tracking, material requisition, safety reporting, sub-vendor control, remote handovers, e-learning, self-audits, forecasting, cost analysis, certification renewal, asset tracking, joint WOs, warranty/liability, dispute resolution, marketing hub, and off-site integration.
+
+3. Core ↔ Vendor Harmonisation Layer (#96–#105)
+   - Regulatory alignment hub, joint audits, cross-authorisation, unified reporting, joint approvals, shared maintenance data, integrated risk assessment, harmonised document control, compliance status board, joint training tracker.
+
+4. Shared Parts Logistics Modules (#106–#113)
+   - Shared parts catalogue, vendor parts ordering portal, approval & cost allocation workflow, parts pick-up scheduling, return & inspection, vendor-owned parts registration, supply chain performance dashboard, compliance blocking for non-conforming parts.
+
+5. Shared Tool Store Modules (#114–#121)
+   - Shared tool inventory, vendor borrow/return workflow, tool reservation scheduler, usage tracking, vendor-owned tool registration, calibration request portal, tool damage/loss reporting, tool performance dashboard.
+
+----------------------------------------------
+Regulatory Compliance Mapping Summary:
+----------------------------------------------
+
+Regulations Covered:
+- EASA Part-145 (A.30, A.40, A.42, A.45, A.50, A.60, A.65, A.70, A.75, A.90)
+- FAA Part 43 & Part 145, FAA AC 43-18, FAA AC 145-9, FAA AC 120-66B, FAA AC 145-10, FAA AC 120-92B
+- ISO 9001:2015 (Clauses 6, 7, 8, 9, 10)
+- ISO 27001:2013 (Information security for digital data modules)
+
+Key Compliance Principles:
+- All parts and tools require certification verification before allocation.
+- Joint approvals and documentation control eliminate discrepancies between core and third-party vendors.
+- Safety, quality, and training data is unified under a single source of truth.
+- Real-time compliance dashboards ensure immediate detection of deviations.
+- Full traceability of every asset, part, tool, and work order.
+
+----------------------------------------------
+Audit-Ready Features:
+----------------------------------------------
+- Dual sign-off workflows for joint projects.
+- Centralised document control with harmonised formats.
+- Integrated vendor forecasting and capacity planning.
+- Real-time KPI and compliance dashboards.
+- Automated compliance blocking for non-conforming assets.
+
+----------------------------------------------
+Usage Instruction:
+----------------------------------------------
+This document should be kept as the master reference for all SkyLog development, expansion, and regulatory submission preparation. 
+If context is lost in conversation threads, this file can be re-shared to instantly restore the system blueprint.
+
+----------------------------------------------
+Current Module Count:
+----------------------------------------------
+121 Modules Total – Fully integrated and compliant.
+

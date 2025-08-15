@@ -1,0 +1,407 @@
+# SkyLog MVP Blueprint v1 – Modules 13 & 17 (Unified Quality & Safety Reporting + Regulatory Alignment Hub)
+
+## 0) Scope
+
+**Objective:** Ship a working demo that proves end‑to‑end workflows for Safety/Quality reporting and Regulatory alignment.
+**Modules covered:**
+
+* Module 13: Unified Quality & Safety Reporting System
+* Module 17: Regulatory Alignment Hub
+  **Form factors:** Web (Next.js) + Mobile (Expo/React Native)
+  **Tenancy:** Single-tenant for demo; simple `org_id` column for future multi‑tenant.
+
+## 1) Roles & RBAC
+
+* **ADMIN**: Org setup, user provisioning, configs.
+* **SAFETY\_MANAGER**: triage, assign, approve/close, export.
+* **QUALITY\_INSPECTOR**: create reports, add evidence, propose CAPA.
+* **ENGINEER**: create reports, add evidence, implement actions.
+* **AUDITOR**: read all, comment, export, mark audit links.
+* **VIEWER**: read-only dashboards.
+
+RBAC principle: server-side checks by role + row-level org isolation. In Supabase, use RLS policies keyed by `org_id` + role claims in JWT.
+
+## 2) Data Model (ERD summary)
+
+```
+orgs (1)───< users
+orgs (1)───< regs
+orgs (1)───< reg_changes
+orgs (1)───< findings ──< evidence
+findings (1)───< actions (CAPA)
+findings (m)───(m) regs via finding_reg_links
+audit_log captures all mutations
+```
+
+### Core Tables
+
+**orgs**
+
+* id (uuid, pk)
+* name (text)
+* tz (text, default 'UTC')
+* created\_at (timestamptz, default now())
+
+**users** (mirror of Supabase auth, with profile)
+
+* id (uuid, pk)
+* org\_id (uuid, fk orgs.id)
+* email (text, unique)
+* name (text)
+* role (text check in \['ADMIN','SAFETY\_MANAGER','QUALITY\_INSPECTOR','ENGINEER','AUDITOR','VIEWER'])
+* active (bool, default true)
+* created\_at (timestamptz)
+
+**regs** (regulatory clauses + references)
+
+* id (uuid, pk)
+* org\_id (uuid)
+* source (text)  -- 'EASA Part-145','FAA','IOSA','Company MOE'
+* code (text)    -- e.g., '145.A.50'
+* title (text)
+* text (text)
+* version (text) -- e.g., 'ED 2025-01'
+* effective\_date (date)
+* tags (text\[])
+* created\_at (timestamptz)
+* unique(org\_id, source, code, version)
+
+**reg\_changes** (tracking updates/diffs)
+
+* id (uuid, pk)
+* org\_id (uuid)
+* reg\_id (uuid fk regs.id)
+* change\_type (text) -- 'ADDED'|'UPDATED'|'RETIRED'
+* summary (text)
+* diff\_before (text)  -- optional
+* diff\_after (text)   -- optional
+* published\_at (timestamptz)
+* created\_at (timestamptz)
+
+**findings** (safety/quality reports)
+
+* id (uuid, pk)
+* org\_id (uuid)
+* ref\_no (text)  -- human-readable incremental like 'F-000123'
+* type (text check in \['SAFETY','QUALITY','INCIDENT','HAZARD'])
+* status (text check in \['OPEN','UNDER\_REVIEW','ACTION','VERIFICATION','CLOSED','REJECTED'])
+* severity (text check in \['LOW','MEDIUM','HIGH','CRITICAL'])
+* reporter\_id (uuid fk users.id)
+* assignee\_id (uuid fk users.id)  -- nullable
+* location (text)  -- e.g., 'Hangar 2, Bay B'
+* lat (numeric(9,6))
+* lng (numeric(9,6))
+* occurred\_at (timestamptz)
+* reported\_at (timestamptz default now())
+* description (text)
+* root\_cause (text)
+* verification\_note (text)
+* closed\_at (timestamptz)
+* created\_at (timestamptz)
+* indexes: (org\_id,status), (org\_id,severity), (org\_id,occurred\_at desc)
+
+**finding\_reg\_links** (many-to-many to regs)
+
+* id (uuid, pk)
+* org\_id (uuid)
+* finding\_id (uuid fk findings.id)
+* reg\_id (uuid fk regs.id)
+* rationale (text)
+* created\_at (timestamptz)
+* unique(finding\_id, reg\_id)
+
+**evidence** (photos, videos, files)
+
+* id (uuid, pk)
+* org\_id (uuid)
+* finding\_id (uuid fk findings.id)
+* uploader\_id (uuid fk users.id)
+* file\_path (text) -- Supabase storage path
+* mime (text)
+* bytes (int8)
+* captured\_at (timestamptz)
+* gps\_lat (numeric(9,6))
+* gps\_lng (numeric(9,6))
+* note (text)
+* created\_at (timestamptz)
+
+**actions** (CAPA lifecycle)
+
+* id (uuid, pk)
+* org\_id (uuid)
+* finding\_id (uuid fk findings.id)
+* kind (text check in \['CORRECTIVE','PREVENTIVE'])
+* owner\_id (uuid fk users.id)
+* due\_at (timestamptz)
+* status (text check in \['PLANNED','IN\_PROGRESS','DONE','REJECTED'])
+* details (text)
+* verified\_by (uuid fk users.id)
+* verified\_at (timestamptz)
+* created\_at (timestamptz)
+
+**audit\_log** (append-only)
+
+* id (bigserial, pk)
+* org\_id (uuid)
+* actor\_id (uuid)
+* entity (text)  -- 'finding','action','evidence','reg','user'
+* entity\_id (uuid)
+* op (text) -- 'CREATE','UPDATE','DELETE','LINK','STATUS\_CHANGE','CLOSE'
+* before (jsonb)
+* after (jsonb)
+* at (timestamptz default now())
+* sig (text) -- optional hash/signature for tamper-evidence
+
+## 3) Supabase RLS (row-level security) Sketch
+
+* All tables: `org_id = auth.jwt()->>'org_id'`
+* Role gates by function: e.g., only `SAFETY_MANAGER` can close findings, only `ADMIN` can upsert regs.
+* Evidence: only `uploader_id` or managers can delete; otherwise read.
+
+## 4) API Endpoints (Next.js /api)
+
+* `POST /api/findings` create
+* `GET /api/findings?status=&q=&from=&to=` list/search
+* `GET /api/findings/:id` detail (with evidence, actions, reg links)
+* `PATCH /api/findings/:id` update fields
+* `POST /api/findings/:id/status` transitions: UNDER\_REVIEW/ACTION/VERIFICATION/CLOSED/REJECTED
+* `POST /api/findings/:id/evidence` upload signed URL then persist row
+* `POST /api/findings/:id/actions` add CAPA
+* `PATCH /api/actions/:id` update CAPA
+* `POST /api/findings/:id/regs` link a reg with rationale
+* `GET /api/regs?source=&q=` search regs
+* `POST /api/regs` upsert (ADMIN)
+* `GET /api/reg-changes` recent changes feed for the hub
+* `GET /api/audit-log?entity=&id=` read-only
+
+All writes emit to `audit_log` via DB triggers.
+
+## 5) Status Machine (Findings)
+
+* OPEN → UNDER\_REVIEW (triage by Safety Manager)
+* UNDER\_REVIEW → ACTION (CAPA required)
+* ACTION → VERIFICATION (owner marks DONE; manager moves to verification)
+* VERIFICATION → CLOSED (manager verifies effectiveness) or → ACTION (if failed)
+* OPEN/UNDER\_REVIEW → REJECTED (with reason)
+
+Validation:
+
+* Cannot CLOSE without ≥1 action DONE and verification note.
+* Severity CRITICAL forces manager assignment within 24h.
+
+## 6) Regulatory Alignment Hub
+
+Features:
+
+* Clause library with versioning (`regs`, `reg_changes`).
+* Search by source, code, tag, full-text.
+* Link findings to clauses via `finding_reg_links`.
+* "What changed" view: show diffs and affected open findings.
+* Export CSV/PDF for auditors.
+
+## 7) Frontend Screens
+
+### Web (Manager)
+
+1. **Dashboard**: Open by severity, aging buckets, trend chart, latest reg changes.
+2. **Inbox/Triage**: list with filters, bulk assign, severity badges.
+3. **Finding Detail**: timeline, evidence gallery, CAPA panel, reg links, status transitions.
+4. **Reg Hub**: clause search, version history, change log, impact list.
+5. **Reports/Export**: CSV/PDF of findings, CAPA status, SLA metrics.
+6. **Admin**: users, roles, org settings.
+
+### Mobile (Expo)
+
+1. **Quick Report**: type, severity, description, occurred\_at, location auto, photos/video, offline queue.
+2. **My Actions**: list of CAPAs assigned to me.
+3. **My Reports**: status and comments.
+
+## 8) Metrics & SLAs
+
+* **MTTC (Mean Time to Close)** per severity.
+* **Aging**: >7d, >14d, >30d buckets.
+* **CAPA effectiveness**: % not re-opened within 90d.
+* **Reg changes coverage**: % of new/updated clauses reviewed within 14d.
+
+## 9) SQL DDL (PostgreSQL/Supabase)
+
+```sql
+create table orgs (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  tz text not null default 'UTC',
+  created_at timestamptz not null default now()
+);
+
+create table users (
+  id uuid primary key,
+  org_id uuid not null references orgs(id) on delete cascade,
+  email text not null unique,
+  name text not null,
+  role text not null check (role in ('ADMIN','SAFETY_MANAGER','QUALITY_INSPECTOR','ENGINEER','AUDITOR','VIEWER')),
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create table regs (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references orgs(id) on delete cascade,
+  source text not null,
+  code text not null,
+  title text not null,
+  text text not null,
+  version text not null,
+  effective_date date,
+  tags text[],
+  created_at timestamptz not null default now(),
+  unique(org_id, source, code, version)
+);
+
+create table reg_changes (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references orgs(id) on delete cascade,
+  reg_id uuid not null references regs(id) on delete cascade,
+  change_type text not null check (change_type in ('ADDED','UPDATED','RETIRED')),
+  summary text,
+  diff_before text,
+  diff_after text,
+  published_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create table findings (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references orgs(id) on delete cascade,
+  ref_no text not null,
+  type text not null check (type in ('SAFETY','QUALITY','INCIDENT','HAZARD')),
+  status text not null check (status in ('OPEN','UNDER_REVIEW','ACTION','VERIFICATION','CLOSED','REJECTED')) default 'OPEN',
+  severity text not null check (severity in ('LOW','MEDIUM','HIGH','CRITICAL')),
+  reporter_id uuid not null references users(id),
+  assignee_id uuid references users(id),
+  location text,
+  lat numeric(9,6),
+  lng numeric(9,6),
+  occurred_at timestamptz,
+  reported_at timestamptz not null default now(),
+  description text not null,
+  root_cause text,
+  verification_note text,
+  closed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index on findings (org_id, status);
+create index on findings (org_id, severity);
+create index on findings (org_id, occurred_at desc);
+
+create table finding_reg_links (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references orgs(id) on delete cascade,
+  finding_id uuid not null references findings(id) on delete cascade,
+  reg_id uuid not null references regs(id) on delete cascade,
+  rationale text,
+  created_at timestamptz not null default now(),
+  unique(finding_id, reg_id)
+);
+
+create table evidence (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references orgs(id) on delete cascade,
+  finding_id uuid not null references findings(id) on delete cascade,
+  uploader_id uuid not null references users(id),
+  file_path text not null,
+  mime text,
+  bytes bigint,
+  captured_at timestamptz,
+  gps_lat numeric(9,6),
+  gps_lng numeric(9,6),
+  note text,
+  created_at timestamptz not null default now()
+);
+
+create table actions (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references orgs(id) on delete cascade,
+  finding_id uuid not null references findings(id) on delete cascade,
+  kind text not null check (kind in ('CORRECTIVE','PREVENTIVE')),
+  owner_id uuid not null references users(id),
+  due_at timestamptz,
+  status text not null check (status in ('PLANNED','IN_PROGRESS','DONE','REJECTED')) default 'PLANNED',
+  details text,
+  verified_by uuid references users(id),
+  verified_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create table audit_log (
+  id bigserial primary key,
+  org_id uuid not null,
+  actor_id uuid,
+  entity text not null,
+  entity_id uuid not null,
+  op text not null,
+  before jsonb,
+  after jsonb,
+  at timestamptz not null default now(),
+  sig text
+);
+```
+
+## 10) DB Triggers (pseudo)
+
+* On INSERT/UPDATE/DELETE of findings/actions/evidence/regs → write row to `audit_log` with `before/after` JSON.
+* On findings status change to `CLOSED` → require check: at least one action DONE + `verification_note` not null.
+* Generate `ref_no` as sequence `F-000001` per org.
+
+## 11) Storage
+
+* Supabase Storage bucket `evidence/{org_id}/{finding_id}/{uuid}.{ext}`
+* Signed URL write on client → server persists metadata.
+
+## 12) Search
+
+* Postgres full-text on `findings.description, root_cause` and `regs.text`.
+* GIN index for tags on `regs`.
+
+## 13) Offline Mobile
+
+* Local queue (SQLite via Expo) for pending reports with media; background sync when online.
+
+## 14) Acceptance Criteria (Demo)
+
+* Create finding on mobile with photo + GPS while offline. Syncs when online.
+* Manager triages to ACTION, assigns CAPA, due date set.
+* Owner marks CAPA DONE. Manager verifies and CLOSES.
+* Link finding to at least one reg clause. Reg hub shows linkage.
+* Reg change created → hub shows impacted open findings.
+* Audit export CSV shows all steps and timestamps.
+
+## 15) Seed Data (Demo)
+
+* 5 users across roles, 20 sample findings (varied severity), 50 regs (EASA Part 145 subset), 6 reg\_changes.
+
+## 16) Roadmap Hooks
+
+* Notifications (email/web push) on status transitions.
+* SSO (SAML/OIDC) for enterprise pilots.
+* Evidence hashing for tamper-evidence.
+
+## 17) Implementation Order (2–3 sprints)
+
+1. Schema + RLS + seed + CRUD for findings
+2. Evidence upload + mobile Quick Report (offline queue)
+3. CAPA + status machine + audit\_log
+4. Reg hub + linking + change impact view
+5. Metrics dashboard + CSV export
+
+## 18) Risks & Mitigations
+
+* **Data leakage** → strict RLS, org-scoped queries, least-privilege service role.
+* **Audit gaps** → append-only audit\_log, time sync, exportable evidence trails.
+* **Adoption** → mobile UX: 30s to file a report, minimal fields, voice-to-text.
+
+## 19) Demo Checklist
+
+* One-click Vercel deploy with envs.
+* Expo QR for mobile.
+* Scripted dataset and demo script.
+* PDF handout: flow, metrics, roadmap.
